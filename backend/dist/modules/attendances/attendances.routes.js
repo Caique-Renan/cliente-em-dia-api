@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.attendancesRoutes = void 0;
+const express_1 = require("express");
+const attendances_controller_1 = require("./attendances.controller");
+const auth_1 = require("../../middlewares/auth");
+const router = (0, express_1.Router)();
+exports.attendancesRoutes = router;
+router.use(auth_1.requireAuth, auth_1.requireActiveCompany);
+router.get('/', attendances_controller_1.attendancesController.list);
+router.get('/:id', attendances_controller_1.attendancesController.getById);
+router.post('/', attendances_controller_1.attendancesController.create);
+router.patch('/:id', attendances_controller_1.attendancesController.update);
+router.patch('/:id/status', attendances_controller_1.attendancesController.updateStatus);

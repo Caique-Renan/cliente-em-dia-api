@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.local
+.env.production
+logs
+coverage
+.git
+*.tmp
+
+!.env.example
+!.env.docker.example
+!package-lock.json
+!prisma/schema.prisma

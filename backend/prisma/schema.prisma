@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  ATTENDANT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum CustomerSource {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  GOOGLE
+  REFERRAL
+  WALK_IN
+  PHONE
+  WEBSITE
+  ADS
+  OTHER
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum AttendanceStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  QUOTE_SENT
+  NEGOTIATION
+  WON
+  LOST
+  POST_SALE
+  CANCELED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELED
+}
+
+enum TaskType {
+  FOLLOW_UP
+  SEND_QUOTE
+  CONFIRM_APPOINTMENT
+  POST_SALE
+  ASK_REVIEW
+  REACTIVATION
+  COLLECTION
+  OTHER
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MessageAction {
+  COPIED
+  OPENED_WHATSAPP
+  MANUAL_NOTE
+}
+
+model Company {
+  id              String            @id @default(uuid())
+  name            String
+  document        String?
+  email           String?
+  phone           String?
+  whatsapp        String?
+  segment         String?
+  city            String?
+  state           String?
+  address         String?
+  status          CompanyStatus     @default(ACTIVE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  users           CompanyUser[]
+  customers       Customer[]
+  attendances     Attendance[]
+  quotes          Quote[]
+  tasks           Task[]
+  messageTemplates MessageTemplate[]
+  messageLogs     MessageLog[]
+  activityLogs    ActivityLog[]
+
+  @@index([createdAt])
+}
+
+model User {
+  id              String            @id @default(uuid())
+  name            String
+  email           String            @unique
+  passwordHash    String
+  status          UserStatus        @default(ACTIVE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  companies       CompanyUser[]
+  assignedTasks   Task[]            @relation("TaskAssignedTo")
+  createdTasks    Task[]            @relation("TaskCreatedBy")
+  assignedCustomers Customer[]      @relation("CustomerAssignedTo")
+  createdCustomers  Customer[]      @relation("CustomerCreatedBy")
+  assignedAttendances Attendance[]  @relation("AttendanceAssignedTo")
+  createdAttendances  Attendance[]  @relation("AttendanceCreatedBy")
+  createdQuotes   Quote[]           @relation("QuoteCreatedBy")
+  activityLogs    ActivityLog[]
+  messageLogs     MessageLog[]      @relation("MessageLogCreatedBy")
+  messageTemplates MessageTemplate[] @relation("TemplateCreatedBy")
+
+  @@index([createdAt])
+}
+
+model CompanyUser {
+  id              String            @id @default(uuid())
+  companyId       String
+  userId          String
+  role            Role              @default(ATTENDANT)
+  status          UserStatus        @default(ACTIVE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model Customer {
+  id              String            @id @default(uuid())
+  companyId       String
+  name            String
+  document        String?
+  phone           String?
+  email           String?
+  city            String?
+  district        String?
+  address         String?
+  source          CustomerSource    @default(OTHER)
+  status          CustomerStatus    @default(ACTIVE)
+  notes           String?
+  lastContactAt   DateTime?
+  
+  assignedToId    String?
+  createdById     String
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  assignedTo      User?             @relation("CustomerAssignedTo", fields: [assignedToId], references: [id])
+  createdBy       User              @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  
+  attendances     Attendance[]
+  quotes          Quote[]
+  tasks           Task[]
+  messageLogs     MessageLog[]
+
+  @@index([companyId])
+  @@index([phone])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@index([companyId, phone])
+  @@index([companyId, status])
+  @@index([companyId, source])
+}
+
+model Attendance {
+  id              String            @id @default(uuid())
+  companyId       String
+  customerId      String
+  
+  title           String?
+  description     String?
+  source          CustomerSource    @default(OTHER)
+  priority        Priority          @default(NORMAL)
+  potentialValueCents Int?              
+  status          AttendanceStatus  @default(NEW)
+  lossReason      String?
+
+  assignedToId    String?
+  createdById     String
+
+  lastInteractionAt DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  assignedTo      User?             @relation("AttendanceAssignedTo", fields: [assignedToId], references: [id])
+  createdBy       User              @relation("AttendanceCreatedBy", fields: [createdById], references: [id])
+  
+  quotes          Quote[]
+  tasks           Task[]
+  messageLogs     MessageLog[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@index([companyId, status])
+  @@index([companyId, assignedToId])
+  @@index([companyId, lastInteractionAt])
+}
+
+model Quote {
+  id              String            @id @default(uuid())
+  companyId       String
+  customerId      String
+  attendanceId    String?
+  
+  quoteNumber     String?
+  title           String
+  description     String?
+  status          QuoteStatus       @default(DRAFT)
+  totalValueCents Int               @default(0)
+  validUntil      DateTime?
+  paymentTerms    String?
+  deliveryTerms   String?
+  notes           String?
+
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  
+  createdById     String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  createdBy       User              @relation("QuoteCreatedBy", fields: [createdById], references: [id])
+  
+  items           QuoteItem[]
+  tasks           Task[]
+  messageLogs     MessageLog[]
+
+  @@unique([companyId, quoteNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([attendanceId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([companyId, status])
+  @@index([companyId, validUntil])
+}
+
+model QuoteItem {
+  id              String            @id @default(uuid())
+  quoteId         String
+  
+  description     String
+  quantity        Decimal           @default(1) @db.Decimal(10, 2)
+  unitPriceCents  Int               @default(0)
+  discountCents   Int               @default(0)
+  totalPriceCents Int               @default(0)
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  quote           Quote             @relation(fields: [quoteId], references: [id])
+
+  @@index([quoteId])
+}
+
+model Task {
+  id              String            @id @default(uuid())
+  companyId       String
+  
+  customerId      String?
+  attendanceId    String?
+  quoteId         String?
+
+  title           String
+  description     String?
+  type            TaskType          @default(OTHER)
+  priority        Priority          @default(NORMAL)
+  status          TaskStatus        @default(TODO)
+  
+  dueDate         DateTime?
+  completedAt     DateTime?
+
+  assignedToId    String?
+  createdById     String
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  quote           Quote?            @relation(fields: [quoteId], references: [id])
+  assignedTo      User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdBy       User              @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  messageLogs     MessageLog[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([attendanceId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@index([companyId, status, dueDate])
+  @@index([companyId, assignedToId, dueDate])
+}
+
+model MessageTemplate {
+  id              String            @id @default(uuid())
+  companyId       String
+  title           String
+  content         String
+  category        String?
+  isActive        Boolean           @default(true)
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  createdBy       User?             @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+  messageLogs     MessageLog[]
+
+  @@index([companyId])
+}
+
+model MessageLog {
+  id              String            @id @default(uuid())
+  companyId       String
+  customerId      String
+  userId          String
+  attendanceId    String?
+  templateId      String?
+  quoteId         String?
+  taskId          String?
+  
+  content         String?
+  action          MessageAction
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  user            User              @relation("MessageLogCreatedBy", fields: [userId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  template        MessageTemplate?  @relation(fields: [templateId], references: [id])
+  quote           Quote?            @relation(fields: [quoteId], references: [id])
+  task            Task?             @relation(fields: [taskId], references: [id])
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([quoteId])
+  @@index([taskId])
+}
+
+model ActivityLog {
+  id              String            @id @default(uuid())
+  companyId       String
+  userId          String
+  action          String
+  details         String?
+  createdAt       DateTime          @default(now())
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([createdAt])
+}

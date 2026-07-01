@@ -1,0 +1,32 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.errorHandler = errorHandler;
+const zod_1 = require("zod");
+const AppError_1 = require("../errors/AppError");
+function errorHandler(err, req, res, next) {
+    if (err instanceof AppError_1.AppError) {
+        let errorType = 'Bad Request';
+        if (err.statusCode === 401)
+            errorType = 'Unauthorized';
+        if (err.statusCode === 403)
+            errorType = 'Forbidden';
+        if (err.statusCode === 404)
+            errorType = 'Not Found';
+        return res.status(err.statusCode).json({
+            error: errorType,
+            message: err.message,
+        });
+    }
+    if (err instanceof zod_1.ZodError) {
+        return res.status(400).json({
+            error: 'Bad Request',
+            message: 'Validation failed',
+            issues: err.issues,
+        });
+    }
+    console.error('Unhandled error:', err);
+    return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Something went wrong',
+    });
+}
