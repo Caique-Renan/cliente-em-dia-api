@@ -1,6 +1,9 @@
-FROM node:18-slim AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
+
+# Install openssl for Prisma
+RUN apt-get update -y && apt-get install -y openssl
 
 # Install dependencies and build the backend
 COPY backend/package*.json ./
@@ -11,13 +14,17 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production image
-FROM node:18-slim
+FROM node:20-slim
 
 WORKDIR /app
 
+# Install openssl for Prisma in production
+RUN apt-get update -y && apt-get install -y openssl
+
 # Install only production dependencies
 COPY backend/package*.json ./
-RUN npm ci --only=production
+# Don't use --only=production so we get the Prisma CLI needed for generation, or just use npm ci
+RUN npm ci
 
 # Copy compiled code and Prisma schema
 COPY --from=builder /app/dist ./dist
