@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:18-slim AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production image
-FROM node:20-slim
+FROM node:18-slim
 
 WORKDIR /app
 
